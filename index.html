@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSC426 — Secure Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0D1117;
+      --surface:   #161B22;
+      --border:    #30363D;
+      --border-hi: #58A6FF;
+      --text:      #E6EDF3;
+      --muted:     #8B949E;
+      --accent:    #58A6FF;
+      --accent-dk: #388BFD;
+      --success:   #3FB950;
+      --error:     #F85149;
+      --warning:   #D29922;
+      --radius:    10px;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    /* ── Grid of dots background ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background-image: radial-gradient(circle, #30363D 1px, transparent 1px);
+      background-size: 28px 28px;
+      opacity: 0.35;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .page-wrap {
+      position: relative; z-index: 1;
+      width: 100%; max-width: 420px;
+      display: flex; flex-direction: column; align-items: center; gap: 2rem;
+    }
+
+    /* ── Brand mark ── */
+    .brand {
+      display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+    }
+    .brand-icon {
+      width: 52px; height: 52px;
+      background: var(--accent);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 0 6px rgba(88,166,255,0.12);
+    }
+    .brand-icon svg { width: 26px; height: 26px; fill: #0D1117; }
+    .brand-name {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.35rem; font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+    .brand-name span { color: var(--accent); }
+    .brand-sub {
+      font-size: 0.8rem; color: var(--muted);
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+
+    /* ── Card ── */
+    .card {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+    }
+
+    .card-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.25rem; font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+    .card-sub {
+      font-size: 0.85rem; color: var(--muted);
+      margin-bottom: 1.75rem;
+    }
+
+    /* ── Form ── */
+    .field { display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 1.1rem; }
+
+    label {
+      font-size: 0.82rem; font-weight: 500;
+      color: var(--muted);
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    label .hint { font-weight: 400; font-size: 0.78rem; }
+
+    .input-wrap {
+      position: relative; display: flex; align-items: center;
+    }
+    .input-wrap .icon {
+      position: absolute; left: 12px;
+      color: var(--muted); pointer-events: none;
+      display: flex; align-items: center;
+    }
+    .input-wrap .icon svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    input[type="text"],
+    input[type="password"] {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      padding: 0.65rem 2.8rem;
+      outline: none;
+      transition: border-color 0.18s, box-shadow 0.18s;
+    }
+    input:focus {
+      border-color: var(--border-hi);
+      box-shadow: 0 0 0 3px rgba(88,166,255,0.18);
+    }
+    input.valid   { border-color: var(--success); }
+    input.invalid { border-color: var(--error); }
+
+    .toggle-pw {
+      position: absolute; right: 10px;
+      background: none; border: none; cursor: pointer;
+      color: var(--muted); padding: 4px;
+      display: flex; align-items: center;
+      transition: color 0.15s;
+    }
+    .toggle-pw:hover { color: var(--text); }
+    .toggle-pw svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    .field-msg {
+      font-size: 0.78rem; min-height: 1rem;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .field-msg.error   { color: var(--error); }
+    .field-msg.success { color: var(--success); }
+
+    /* ── Password strength bar ── */
+    .strength-wrap { display: none; flex-direction: column; gap: 4px; margin-top: 2px; }
+    .strength-wrap.show { display: flex; }
+    .strength-bars { display: flex; gap: 4px; }
+    .strength-bar {
+      flex: 1; height: 3px; border-radius: 2px;
+      background: var(--border);
+      transition: background 0.25s;
+    }
+    .strength-label { font-size: 0.75rem; color: var(--muted); }
+
+    /* ── Buttons ── */
+    .btn-row { display: flex; gap: 0.75rem; margin-top: 1.5rem; }
+
+    button.primary, button.secondary {
+      flex: 1; height: 42px; border-radius: var(--radius);
+      font-family: inherit; font-size: 0.88rem; font-weight: 600;
+      cursor: pointer; border: none;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      transition: opacity 0.15s, transform 0.1s, background 0.15s;
+    }
+    button.primary {
+      background: var(--accent);
+      color: #0D1117;
+    }
+    button.primary:hover  { background: var(--accent-dk); }
+    button.primary:active { transform: scale(0.98); }
+    button.primary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    button.secondary {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    button.secondary:hover  { border-color: var(--border-hi); color: var(--text); }
+    button.secondary:active { transform: scale(0.98); }
+
+    /* spinner */
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(13,17,23,0.3);
+      border-top-color: #0D1117;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: none;
+    }
+    .loading .spinner { display: block; }
+    .loading .btn-text { display: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Toast notification ── */
+    #toast {
+      position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 0.75rem 1.25rem;
+      font-size: 0.88rem; display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+      transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1), opacity 0.35s;
+      opacity: 0; z-index: 100; white-space: nowrap;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    #toast.success { border-color: var(--success); }
+    #toast.error   { border-color: var(--error);   }
+    #toast .dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    #toast.success .dot { background: var(--success); }
+    #toast.error   .dot { background: var(--error); }
+
+    /* ── Success overlay ── */
+    #success-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 50;
+      background: rgba(13,17,23,0.92);
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 1rem;
+      animation: fadeIn 0.3s ease;
+    }
+    #success-overlay.show { display: flex; }
+    @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+    .checkmark-svg { width: 72px; height: 72px; }
+    .checkmark-circle {
+      fill: none; stroke: var(--success); stroke-width: 2;
+      stroke-dasharray: 166; stroke-dashoffset: 166;
+      animation: drawCircle 0.6s ease forwards 0.1s;
+    }
+    .checkmark-check {
+      fill: none; stroke: var(--success); stroke-width: 2.5;
+      stroke-linecap: round; stroke-linejoin: round;
+      stroke-dasharray: 48; stroke-dashoffset: 48;
+      animation: drawCheck 0.4s ease forwards 0.65s;
+    }
+    @keyframes drawCircle { to { stroke-dashoffset: 0 } }
+    @keyframes drawCheck  { to { stroke-dashoffset: 0 } }
+    .success-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1.4rem; font-weight: 700; color: var(--text);
+    }
+    .success-msg { font-size: 0.9rem; color: var(--muted); }
+    .success-user { color: var(--accent); font-weight: 600; }
+    .back-btn {
+      margin-top: 0.5rem;
+      background: none; border: 1px solid var(--border);
+      color: var(--muted); border-radius: var(--radius);
+      padding: 0.5rem 1.5rem; font-family: inherit;
+      font-size: 0.85rem; cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .back-btn:hover { border-color: var(--border-hi); color: var(--text); }
+
+    /* ── Footer ── */
+    .footer {
+      font-size: 0.78rem; color: var(--muted);
+      text-align: center; line-height: 1.6;
+    }
+    .footer a { color: var(--accent); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+
+    /* ── Demo credentials pill ── */
+    .demo-pill {
+      width: 100%;
+      background: rgba(88,166,255,0.06);
+      border: 1px dashed rgba(88,166,255,0.3);
+      border-radius: var(--radius);
+      padding: 0.6rem 1rem;
+      font-size: 0.8rem; color: var(--muted);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .demo-pill strong { color: var(--accent); }
+    .demo-pill svg { width: 14px; height: 14px; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; flex-shrink: 0; }
+
+    /* ── Responsive ── */
+    @media (max-width: 480px) {
+      .card { padding: 1.5rem; }
+      .btn-row { flex-direction: column-reverse; }
+      button.primary, button.secondary { flex: none; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Success overlay ── -->
+<div id="success-overlay" role="status" aria-live="polite">
+  <svg class="checkmark-svg" viewBox="0 0 52 52">
+    <circle class="checkmark-circle" cx="26" cy="26" r="25"/>
+    <polyline class="checkmark-check" points="14,26 22,34 38,18"/>
+  </svg>
+  <p class="success-title">Welcome back!</p>
+  <p class="success-msg">Signed in as <span class="success-user" id="success-username"></span></p>
+  <button class="back-btn" onclick="resetAll()">Sign out</button>
+</div>
+
+<!-- ── Toast ── -->
+<div id="toast" role="alert" aria-live="assertive">
+  <div class="dot"></div>
+  <span id="toast-msg"></span>
+</div>
+
+<!-- ── Main page ── -->
+<div class="page-wrap">
+
+  <div class="brand">
+    <div class="brand-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <p class="brand-name"><span>CSC</span>426</p>
+    <p class="brand-sub">Secure Portal</p>
+  </div>
+
+  <div class="card">
+    <h1 class="card-title">Sign in to your account</h1>
+    <p class="card-sub">Enter your credentials below to continue</p>
+
+    <!-- Demo hint -->
+    <div class="demo-pill">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      Demo — username: <strong>admin</strong> &nbsp;|&nbsp; password: <strong>Admin@123</strong>
+    </div>
+
+    <form id="login-form" novalidate style="margin-top:1.25rem">
+
+      <!-- Username -->
+      <div class="field">
+        <label for="username">
+          Username
+          <span class="hint">3–20 characters</span>
+        </label>
+        <div class="input-wrap">
+          <span class="icon">
+            <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </span>
+          <input type="text" id="username" name="username"
+                 autocomplete="username" spellcheck="false"
+                 placeholder="e.g. johndoe"
+                 aria-describedby="username-msg" />
+        </div>
+        <span class="field-msg" id="username-msg" aria-live="polite"></span>
+      </div>
+
+      <!-- Password -->
+      <div class="field">
+        <label for="password">
+          Password
+          <span class="hint">Min 8 chars</span>
+        </label>
+        <div class="input-wrap">
+          <span class="icon">
+            <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </span>
+          <input type="password" id="password" name="password"
+                 autocomplete="current-password"
+                 placeholder="Your password"
+                 aria-describedby="password-msg" />
+          <button type="button" class="toggle-pw" id="toggle-pw" aria-label="Show password">
+            <!-- eye icon (shown when password hidden) -->
+            <svg id="eye-show" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <!-- eye-off icon (shown when password visible) -->
+            <svg id="eye-hide" viewBox="0 0 24 24" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </button>
+        </div>
+        <div class="strength-wrap" id="strength-wrap">
+          <div class="strength-bars">
+            <div class="strength-bar" id="sb1"></div>
+            <div class="strength-bar" id="sb2"></div>
+            <div class="strength-bar" id="sb3"></div>
+            <div class="strength-bar" id="sb4"></div>
+          </div>
+          <span class="strength-label" id="strength-label"></span>
+        </div>
+        <span class="field-msg" id="password-msg" aria-live="polite"></span>
+      </div>
+
+      <!-- Buttons -->
+      <div class="btn-row">
+        <button type="button" class="secondary" id="reset-btn" onclick="resetForm()">
+          Reset
+        </button>
+        <button type="submit" class="primary" id="submit-btn">
+          <span class="spinner" id="spinner"></span>
+          <span class="btn-text">Sign in</span>
+        </button>
+      </div>
+
+    </form>
+  </div>
+
+  <p class="footer">
+    CSC426 Web Technologies &mdash; Authentication Demo<br/>
+    <a href="https://github.com" target="_blank" rel="noopener">GitHub Repository</a>
+    &nbsp;&middot;&nbsp;
+    <a href="#" onclick="showToast('Deployed on Netlify/Vercel', 'success'); return false">Deployment</a>
+  </p>
+
+</div>
+
+<script>
+  /* ─────────────── Demo credentials ─────────────── */
+  const USERS = {
+    admin:    'Admin@123',
+    student:  'Student#1',
+    csc426:   'Portal@2024',
+  };
+
+  /* ─────────────── DOM refs ─────────────── */
+  const form      = document.getElementById('login-form');
+  const uInput    = document.getElementById('username');
+  const pInput    = document.getElementById('password');
+  const uMsg      = document.getElementById('username-msg');
+  const pMsg      = document.getElementById('password-msg');
+  const submitBtn = document.getElementById('submit-btn');
+  const spinner   = document.getElementById('spinner');
+  const strengthW = document.getElementById('strength-wrap');
+  const sLabel    = document.getElementById('strength-label');
+  const bars      = [1,2,3,4].map(i => document.getElementById('sb'+i));
+
+  /* ─────────────── Validation helpers ─────────────── */
+  const rules = {
+    username: {
+      required: v => v.length > 0           || 'Username is required',
+      minLen:   v => v.length >= 3          || 'At least 3 characters',
+      maxLen:   v => v.length <= 20         || 'Maximum 20 characters',
+      chars:    v => /^[a-zA-Z0-9._-]+$/.test(v) || 'Letters, numbers, . _ - only',
+    },
+    password: {
+      required: v => v.length > 0   || 'Password is required',
+      minLen:   v => v.length >= 8  || 'At least 8 characters',
+    }
+  };
+
+  function validate(input, fieldRules) {
+    const v = input.value.trim();
+    for (const rule of Object.values(fieldRules)) {
+      const result = rule(v);
+      if (result !== true) return { ok: false, msg: result };
+    }
+    return { ok: true, msg: '' };
+  }
+
+  function setFieldState(input, msgEl, state, msg) {
+    input.classList.remove('valid','invalid');
+    msgEl.className = 'field-msg';
+    if (state === 'ok') {
+      input.classList.add('valid');
+      msgEl.classList.add('success');
+      msgEl.textContent = msg || '✓ Looks good';
+    } else if (state === 'error') {
+      input.classList.add('invalid');
+      msgEl.classList.add('error');
+      msgEl.textContent = msg;
+    } else {
+      msgEl.textContent = '';
+    }
+  }
+
+  /* ─────────────── Password strength ─────────────── */
+  function calcStrength(pw) {
+    let score = 0;
+    if (pw.length >= 8)  score++;
+    if (pw.length >= 12) score++;
+    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^a-zA-Z0-9]/.test(pw)) score++;
+    return Math.min(4, score);
+  }
+
+  const strengthMeta = [
+    null,
+    { label: 'Weak',      color: '#F85149' },
+    { label: 'Fair',      color: var_warning() },
+    { label: 'Good',      color: '#58A6FF' },
+    { label: 'Strong',    color: '#3FB950' },
+  ];
+
+  function var_warning() { return '#D29922'; }
+
+  function updateStrength(pw) {
+    if (!pw) { strengthW.classList.remove('show'); return; }
+    strengthW.classList.add('show');
+    const score = calcStrength(pw);
+    const meta  = strengthMeta[score] || strengthMeta[1];
+    bars.forEach((b, i) => {
+      b.style.background = i < score ? meta.color : 'var(--border)';
+    });
+    sLabel.textContent = meta.label;
+    sLabel.style.color = meta.color;
+  }
+
+  /* ─────────────── Live validation ─────────────── */
+  uInput.addEventListener('blur', () => {
+    const res = validate(uInput, rules.username);
+    setFieldState(uInput, uMsg, res.ok ? 'ok' : 'error', res.msg);
+  });
+  uInput.addEventListener('input', () => {
+    if (uInput.classList.contains('invalid')) {
+      const res = validate(uInput, rules.username);
+      if (res.ok) setFieldState(uInput, uMsg, 'ok', '');
+    }
+  });
+
+  pInput.addEventListener('input', () => {
+    updateStrength(pInput.value);
+    if (pInput.classList.contains('invalid')) {
+      const res = validate(pInput, rules.password);
+      if (res.ok) setFieldState(pInput, pMsg, 'ok', '');
+    }
+  });
+  pInput.addEventListener('blur', () => {
+    const res = validate(pInput, rules.password);
+    setFieldState(pInput, pMsg, res.ok ? 'ok' : 'error', res.msg);
+  });
+
+  /* ─────────────── Toggle password visibility ─────────────── */
+  document.getElementById('toggle-pw').addEventListener('click', () => {
+    const isHidden = pInput.type === 'password';
+    pInput.type = isHidden ? 'text' : 'password';
+    document.getElementById('eye-show').style.display = isHidden ? 'none' : '';
+    document.getElementById('eye-hide').style.display = isHidden ? ''     : 'none';
+    document.getElementById('toggle-pw').setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+  });
+
+  /* ─────────────── Form submit ─────────────── */
+  let attempts = 0;
+  const MAX_ATTEMPTS = 5;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    // Validate all fields
+    const uRes = validate(uInput, rules.username);
+    const pRes = validate(pInput, rules.password);
+
+    setFieldState(uInput, uMsg, uRes.ok ? 'ok' : 'error', uRes.msg);
+    setFieldState(pInput, pMsg, pRes.ok ? 'ok' : 'error', pRes.msg);
+
+    if (!uRes.ok || !pRes.ok) {
+      showToast('Please fix the errors above', 'error');
+      return;
+    }
+
+    if (attempts >= MAX_ATTEMPTS) {
+      showToast('Too many attempts. Please wait.', 'error');
+      return;
+    }
+
+    // Loading state
+    submitBtn.disabled = true;
+    submitBtn.classList.add('loading');
+
+    // Simulate network delay (replace with real fetch in backend version)
+    await delay(900 + Math.random() * 400);
+
+    submitBtn.disabled = false;
+    submitBtn.classList.remove('loading');
+
+    const username = uInput.value.trim().toLowerCase();
+    const password = pInput.value;
+
+    if (USERS[username] && USERS[username] === password) {
+      attempts = 0;
+      document.getElementById('success-username').textContent = uInput.value.trim();
+      document.getElementById('success-overlay').classList.add('show');
+    } else {
+      attempts++;
+      const remaining = MAX_ATTEMPTS - attempts;
+      setFieldState(pInput, pMsg, 'error',
+        remaining > 0
+          ? `Incorrect credentials. ${remaining} attempt${remaining > 1 ? 's' : ''} remaining`
+          : 'Too many failed attempts'
+      );
+      setFieldState(uInput, uMsg, 'error', '');
+      showToast('Invalid username or password', 'error');
+      pInput.value = '';
+      updateStrength('');
+    }
+  });
+
+  /* ─────────────── Reset ─────────────── */
+  function resetForm() {
+    form.reset();
+    setFieldState(uInput, uMsg, 'none', '');
+    setFieldState(pInput, pMsg, 'none', '');
+    updateStrength('');
+    uInput.focus();
+    showToast('Form cleared', 'success');
+  }
+
+  function resetAll() {
+    document.getElementById('success-overlay').classList.remove('show');
+    resetForm();
+    attempts = 0;
+  }
+
+  /* ─────────────── Toast ─────────────── */
+  let toastTimer;
+  function showToast(msg, type = 'success') {
+    const toast = document.getElementById('toast');
+    toast.className = 'show ' + type;
+    document.getElementById('toast-msg').textContent = msg;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toast.className = type; }, 3200);
+  }
+
+  /* ─────────────── Utils ─────────────── */
+  function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // Focus username on load
+  window.addEventListener('load', () => uInput.focus());
+</script>
+</body>
+</html>
