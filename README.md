@@ -6,6 +6,14 @@ NAME: OLATUNJI RAPHAEL OLAYINKA
 
 MATRIC NUMBER: 220404185
 
+# Tools Used
+
+HTML
+
+CSS
+
+JAVASCRIPT 
+
 # Screenshot 
 
 '''
